@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Teclado Mecánico RGB V2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        body {
+            background-color: #111; /* Darker background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Arial', sans-serif;
+        }
+
+        /* --- Keyboard Container Styling --- */
+        .keyboard-container {
+            position: relative; /* Needed for the border glow */
+            padding: 5px; /* Space for the border glow */
+            border-radius: 20px; /* Match keyboard border-radius + padding */
+            overflow: hidden; /* Clip the glow animation */
+            background: #2a2a4a; /* Base color */
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Keyboard Edge RGB Glow Effect */
+        .keyboard-container::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 20px;
+            padding: 3px; /* Thickness of the glow border */
+            background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
+            background-size: 400% 400%;
+            animation: keyboard-border-glow 10s linear infinite;
+            -webkit-mask:
+                linear-gradient(#fff 0 0) content-box,
+                linear-gradient(#fff 0 0);
+            mask:
+                linear-gradient(#fff 0 0) content-box,
+                linear-gradient(#fff 0 0);
+            -webkit-mask-composite: destination-out;
+            mask-composite: exclude;
+            z-index: -1; /* Place behind the keyboard */
+        }
+
+        @keyframes keyboard-border-glow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .keyboard {
+            background-color: #2a2a4a; /* Slightly lighter base inside border */
+            padding: 20px;
+            border-radius: 15px; /* Inner radius */
+            display: inline-block; /* Fit content */
+            position: relative; /* Ensure keys are above the border glow */
+            z-index: 1;
+        }
+
+        .keyboard-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+         .keyboard-row:last-child {
+            margin-bottom: 0;
+        }
+
+        /* --- Key Styling --- */
+        .key {
+            background-color: #353555; /* Darker keycap base */
+            color: #e0e0e0; /* Lighter text */
+            border: none; /* Remove default border */
+            border-radius: 50%; /* Fully rounded keys */
+            width: 55px;
+            height: 55px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 0 5px;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.1s ease-out, background-color 0.1s ease-out, box-shadow 0.1s ease-out;
+            position: relative; /* Needed for pseudo-elements */
+            box-shadow: 0 4px 2px rgba(0,0,0,0.3), /* Bottom shadow */
+                        inset 0 2px 1px rgba(255, 255, 255, 0.1), /* Top inner highlight */
+                        inset 0 -2px 1px rgba(0, 0, 0, 0.2); /* Bottom inner shadow */
+            overflow: hidden; /* Hide overflow from inner glow */
+        }
+
+        /* Constant Key RGB Glow (using pseudo-element) */
+        .key::before {
+            content: '';
+            position: absolute;
+            top: -3px; left: -3px; right: -3px; bottom: -3px; /* Slightly larger */
+            border-radius: inherit; /* Match key's border-radius */
+            z-index: -1; /* Behind the key */
+            box-shadow: 0 0 3px 1px rgba(255, 255, 255, 0.1); /* Subtle base white glow */
+            animation: key-rgb-subtle-glow 5s infinite linear;
+            opacity: 0.8; /* Make it subtle */
+        }
+
+        @keyframes key-rgb-subtle-glow {
+             0% { box-shadow: 0 0 4px 1px #ff0000; }
+            16% { box-shadow: 0 0 4px 1px #ffae00; }
+            32% { box-shadow: 0 0 4px 1px #fffb00; }
+            48% { box-shadow: 0 0 4px 1px #48ff00; }
+            64% { box-shadow: 0 0 4px 1px #00ffd5; }
+            80% { box-shadow: 0 0 4px 1px #002bff; }
+            96% { box-shadow: 0 0 4px 1px #ff00c8; }
+            100% { box-shadow: 0 0 4px 1px #ff0000; }
+        }
+
+
+        /* Specific key sizes */
+        .key.space { width: 315px; border-radius: 25px; } /* Space bar */
+        .key.shift-left, .key.shift-right { width: 100px; border-radius: 25px; }
+        .key.caps-lock, .key.tab { width: 80px; border-radius: 25px; }
+        .key.enter { width: 90px; border-radius: 25px; }
+        .key.backspace { width: 90px; border-radius: 25px; }
+        .key.ctrl-left, .key.ctrl-right,
+        .key.alt-left, .key.alt-right,
+        .key.meta-left, .key.meta-right { width: 70px; border-radius: 25px;}
+
+
+        /* Pressed state - RED GLOW */
+        .key.pressed {
+            transform: translateY(2px); /* Simulate press - remove scale for stability */
+            background-color: #ff4444; /* Bright red background */
+            color: #fff; /* White text */
+            box-shadow: 0 1px 1px rgba(0,0,0,0.4), /* Reduced bottom shadow */
+                        inset 0 1px 1px rgba(0, 0, 0, 0.2), /* Top inner shadow */
+                        inset 0 -1px 1px rgba(255, 0, 0, 0.5), /* Bottom inner red glow */
+                        0 0 10px 3px #ff0000, /* Strong outer red glow */
+                        0 0 20px 5px rgba(255, 0, 0, 0.5); /* Wider outer red glow */
+        }
+
+        /* Hide the constant subtle glow when pressed */
+        .key.pressed::before {
+            opacity: 0;
+            animation: none; /* Stop animation */
+        }
+
+
+        /* Ensure long keys have text aligned left */
+        .key.shift-left, .key.caps-lock, .key.tab,
+        .key.ctrl-left, .key.meta-left, .key.alt-left { justify-content: flex-start; padding-left: 10px; }
+        .key.shift-right, .key.enter, .key.backspace,
+        .key.ctrl-right, .key.alt-right, .key.meta-right { justify-content: flex-end; padding-right: 10px; }
+        .key.space { justify-content: center; } /* Center space text */
+
+
+    </style>
+</head>
+<body>
+    <div class="keyboard-container">
+        <div class="keyboard" id="keyboard">
+            <div class="keyboard-row">
+                <div class="key" data-key="Backquote">`</div>
+                <div class="key" data-key="Digit1">1</div>
+                <div class="key" data-key="Digit2">2</div>
+                <div class="key" data-key="Digit3">3</div>
+                <div class="key" data-key="Digit4">4</div>
+                <div class="key" data-key="Digit5">5</div>
+                <div class="key" data-key="Digit6">6</div>
+                <div class="key" data-key="Digit7">7</div>
+                <div class="key" data-key="Digit8">8</div>
+                <div class="key" data-key="Digit9">9</div>
+                <div class="key" data-key="Digit0">0</div>
+                <div class="key" data-key="Minus">-</div>
+                <div class="key" data-key="Equal">=</div>
+                <div class="key backspace" data-key="Backspace">Borrar</div>
+            </div>
+
+            <div class="keyboard-row">
+                <div class="key tab" data-key="Tab">Tab</div>
+                <div class="key" data-key="KeyQ">Q</div>
+                <div class="key" data-key="KeyW">W</div>
+                <div class="key" data-key="KeyE">E</div>
+                <div class="key" data-key="KeyR">R</div>
+                <div class="key" data-key="KeyT">T</div>
+                <div class="key" data-key="KeyY">Y</div>
+                <div class="key" data-key="KeyU">U</div>
+                <div class="key" data-key="KeyI">I</div>
+                <div class="key" data-key="KeyO">O</div>
+                <div class="key" data-key="KeyP">P</div>
+                <div class="key" data-key="BracketLeft">[</div>
+                <div class="key" data-key="BracketRight">]</div>
+                <div class="key" data-key="Backslash">\</div>
+            </div>
+
+            <div class="keyboard-row">
+                <div class="key caps-lock" data-key="CapsLock">Bloq Mayús</div>
+                <div class="key" data-key="KeyA">A</div>
+                <div class="key" data-key="KeyS">S</div>
+                <div class="key" data-key="KeyD">D</div>
+                <div class="key" data-key="KeyF">F</div>
+                <div class="key" data-key="KeyG">G</div>
+                <div class="key" data-key="KeyH">H</div>
+                <div class="key" data-key="KeyJ">J</div>
+                <div class="key" data-key="KeyK">K</div>
+                <div class="key" data-key="KeyL">L</div>
+                <div class="key" data-key="Semicolon">;</div>
+                <div class="key" data-key="Quote">'</div>
+                <div class="key enter" data-key="Enter">Enter</div>
+            </div>
+
+            <div class="keyboard-row">
+                <div class="key shift-left" data-key="ShiftLeft">Shift</div>
+                <div class="key" data-key="KeyZ">Z</div>
+                <div class="key" data-key="KeyX">X</div>
+                <div class="key" data-key="KeyC">C</div>
+                <div class="key" data-key="KeyV">V</div>
+                <div class="key" data-key="KeyB">B</div>
+                <div class="key" data-key="KeyN">N</div>
+                <div class="key" data-key="KeyM">M</div>
+                <div class="key" data-key="Comma">,</div>
+                <div class="key" data-key="Period">.</div>
+                <div class="key" data-key="Slash">/</div>
+                <div class="key shift-right" data-key="ShiftRight">Shift</div>
+            </div>
+
+            <div class="keyboard-row">
+                <div class="key ctrl-left" data-key="ControlLeft">Ctrl</div>
+                <div class="key meta-left" data-key="MetaLeft">Win</div> <div class="key alt-left" data-key="AltLeft">Alt</div>
+                <div class="key space" data-key="Space"></div>
+                <div class="key alt-right" data-key="AltRight">AltGr</div>
+                <div class="key meta-right" data-key="MetaRight">Win</div> <div class="key ctrl-right" data-key="ControlRight">Ctrl</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const keyboard = document.getElementById('keyboard');
+        let clickSynth = null; // Initialize synth variable
+
+        // --- Initialize Tone.js Synth ---
+        function initializeAudio() {
+            // Check if Tone is loaded and synth is not already created
+            if (typeof Tone !== 'undefined' && !clickSynth) {
+                // Use MembraneSynth for a percussive click sound
+                clickSynth = new Tone.MembraneSynth({
+                    pitchDecay: 0.01, // Fast decay
+                    octaves: 2,       // Higher pitch range
+                    oscillator: {
+                        type: 'square' // Sharp sound
+                    },
+                    envelope: {
+                        attack: 0.001, // Very short attack
+                        decay: 0.1,   // Short decay
+                        sustain: 0.01,
+                        release: 0.1,
+                        attackCurve: 'linear'
+                    }
+                }).toDestination(); // Connect synth to audio output
+                console.log("Tone.js AudioContext started and Synth created.");
+            }
+        }
+
+        // --- Play Sound Function ---
+        function playClickSound() {
+            // Ensure audio context is started and synth exists
+             if (!clickSynth) {
+                 initializeAudio(); // Try to initialize if not already done
+             }
+
+            // Check if synth exists and audio context is running
+            if (clickSynth && Tone.context.state === 'running') {
+                try {
+                    // Trigger a short, high-pitched note
+                    // 'C5' is the note pitch, '32n' is a very short duration
+                    clickSynth.triggerAttackRelease('C5', '32n', Tone.now()); // Use Tone.now() for precise timing
+                } catch (error) {
+                    console.error("Error playing sound:", error);
+                }
+            } else if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+                 console.warn("AudioContext not running. Click or press a key to start it.");
+                 // Attempt to resume context (might require direct user interaction)
+                 Tone.start().then(() => {
+                     console.log("AudioContext resumed by interaction.");
+                     // Retry playing sound immediately after resuming
+                     if (clickSynth) {
+                         clickSynth.triggerAttackRelease('C5', '32n', Tone.now());
+                     }
+                 }).catch(err => {
+                     console.error("Failed to resume AudioContext:", err);
+                 });
+            }
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('keydown', (event) => {
+            // Prevent default browser behavior for keys like Tab, Space, etc. if needed
+             // event.preventDefault(); // Uncomment carefully if needed
+
+            // Initialize audio on first interaction if not already done
+             if (!clickSynth) {
+                 initializeAudio();
+             }
+             // Attempt to start/resume audio context if suspended
+             if (typeof Tone !== 'undefined' && Tone.context.state === 'suspended') {
+                Tone.start();
+             }
+
+
+            const keyElement = keyboard.querySelector(`.key[data-key="${event.code}"]`);
+            if (keyElement) {
+                keyElement.classList.add('pressed');
+                playClickSound();
+            } else {
+                // console.log("Key not mapped:", event.code); // Log unmapped keys
+            }
+        });
+
+        window.addEventListener('keyup', (event) => {
+            const keyElement = keyboard.querySelector(`.key[data-key="${event.code}"]`);
+            if (keyElement) {
+                keyElement.classList.remove('pressed');
+            }
+        });
+
+        // --- Optional: Allow mouse clicks to trigger keys ---
+        keyboard.addEventListener('mousedown', (event) => {
+            // Check if the clicked element is a key or inside a key
+            const keyElement = event.target.closest('.key');
+            if (keyElement) {
+                // Initialize audio on first interaction if not already done
+                 if (!clickSynth) {
+                     initializeAudio();
+                 }
+                 // Attempt to start/resume audio context if suspended
+                 if (typeof Tone !== 'undefined' && Tone.context.state === 'suspended') {
+                    Tone.start();
+                 }
+
+                keyElement.classList.add('pressed');
+                playClickSound();
+
+                // Simulate keyup shortly after mouseup or mouseleave from the key
+                const releaseKey = () => {
+                    keyElement.classList.remove('pressed');
+                    // Remove listeners specific to this interaction
+                    document.removeEventListener('mouseup', releaseKey); // Listen on document to catch release outside key
+                    keyElement.removeEventListener('mouseleave', releaseKey);
+                };
+                // Listen on document for mouseup to handle dragging off the key
+                document.addEventListener('mouseup', releaseKey);
+                keyElement.addEventListener('mouseleave', releaseKey);
+            }
+        });
+
+         // --- Initial message for starting audio ---
+         window.addEventListener('load', () => {
+             if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+                 console.log("AudioContext needs to be started by user interaction (click or key press).");
+                 // You could display a message on the screen asking the user to click
+             }
+         });
+
+    </script>
+</body>
+</html>
